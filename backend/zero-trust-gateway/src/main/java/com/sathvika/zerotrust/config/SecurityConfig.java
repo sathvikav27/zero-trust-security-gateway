@@ -1,4 +1,3 @@
-
 package com.sathvika.zerotrust.config;
 
 import com.sathvika.zerotrust.auth.JwtAuthenticationFilter;
@@ -19,52 +18,60 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 
-    @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(
-            JwtService jwtService,
-            UserRepository userRepository) {
-        return new JwtAuthenticationFilter(jwtService, userRepository);
-    }
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+}
 
-    @Bean
-    public FilterRegistrationBean<JwtAuthenticationFilter>
-            jwtFilterServletRegistration(
-                    JwtAuthenticationFilter jwtAuthenticationFilter) {
+@Bean
+public JwtAuthenticationFilter jwtAuthenticationFilter(
+        JwtService jwtService,
+        UserRepository userRepository) {
+    return new JwtAuthenticationFilter(jwtService, userRepository);
+}
 
-        FilterRegistrationBean<JwtAuthenticationFilter> registration =
-                new FilterRegistrationBean<>(jwtAuthenticationFilter);
+@Bean
+public FilterRegistrationBean<JwtAuthenticationFilter>
+        jwtFilterServletRegistration(
+                JwtAuthenticationFilter jwtAuthenticationFilter) {
 
-        registration.setEnabled(false);
-        return registration;
-    }
+    FilterRegistrationBean<JwtAuthenticationFilter> registration =
+            new FilterRegistrationBean<>(jwtAuthenticationFilter);
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http,
-            JwtAuthenticationFilter jwtAuthenticationFilter)
-            throws Exception {
+    registration.setEnabled(false);
+    return registration;
+}
 
-        http
-            .csrf(csrf -> csrf.disable())
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .exceptionHandling(exceptions ->
-                exceptions.authenticationEntryPoint(
-                    new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/actuator/health").permitAll()
-                .anyRequest().authenticated())
-            .httpBasic(basic -> basic.disable())
-            .formLogin(form -> form.disable())
-            .addFilterBefore(
-                jwtAuthenticationFilter,
-                UsernamePasswordAuthenticationFilter.class);
+@Bean
+public SecurityFilterChain securityFilterChain(
+        HttpSecurity http,
+        JwtAuthenticationFilter jwtAuthenticationFilter)
+        throws Exception {
 
-        return http.build();
-    }
+    http
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .exceptionHandling(exceptions ->
+            exceptions.authenticationEntryPoint(
+                new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers(
+    "/api/auth/**",
+    "/actuator/health",
+    "/error"
+).permitAll()
+            .requestMatchers("/api/admin/**").hasRole("ADMIN")
+            .anyRequest().authenticated())
+        .httpBasic(basic -> basic.disable())
+        .formLogin(form -> form.disable())
+        .addFilterBefore(
+            jwtAuthenticationFilter,
+            UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+}
+
+
 }
