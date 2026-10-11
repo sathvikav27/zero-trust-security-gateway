@@ -3,11 +3,13 @@ package com.sathvika.zerotrust.config;
 import com.sathvika.zerotrust.audit.SecurityAuditFilter;
 import com.sathvika.zerotrust.auth.JwtAuthenticationFilter;
 import com.sathvika.zerotrust.auth.JwtService;
+import com.sathvika.zerotrust.policy.AccessPolicyService;
 import com.sathvika.zerotrust.user.UserRepository;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -60,7 +62,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
-            SecurityAuditFilter securityAuditFilter)
+            SecurityAuditFilter securityAuditFilter,
+            AccessPolicyService policyService)
             throws Exception {
 
         http
@@ -77,7 +80,16 @@ public class SecurityConfig {
                     "/actuator/health",
                     "/error"
                 ).permitAll()
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/secure/**", "/api/admin/**")
+                    .access((authentication, context) -> {
+                        boolean allowed = policyService.isAllowed(
+                            authentication.get(),
+                            context.getRequest().getMethod(),
+                            context.getRequest().getRequestURI()
+                        );
+
+                        return new AuthorizationDecision(allowed);
+                    })
                 .anyRequest().authenticated())
             .httpBasic(basic -> basic.disable())
             .formLogin(form -> form.disable())

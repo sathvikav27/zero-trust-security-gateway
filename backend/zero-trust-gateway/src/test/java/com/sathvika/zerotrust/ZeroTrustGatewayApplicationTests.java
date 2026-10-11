@@ -27,6 +27,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -228,6 +229,7 @@ class ZeroTrustGatewayApplicationTests {
                                 """))
                 .andExpect(status().isUnauthorized());
     }
+
     @Test
     void expiredTokenIsRejected() throws Exception {
         SecretKey signingKey = (SecretKey)
@@ -283,5 +285,77 @@ class ZeroTrustGatewayApplicationTests {
         mockMvc.perform(get("/api/admin/dashboard")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void adminCanAccessSecureEndpoint() throws Exception {
+        User user = mock(User.class);
+
+        when(user.getEmail()).thenReturn("admin@example.com");
+        when(user.getRole()).thenReturn(Role.ADMIN);
+        when(user.isEnabled()).thenReturn(true);
+
+        when(userRepository.findByEmail("admin@example.com"))
+                .thenReturn(Optional.of(user));
+
+        String token = jwtService.generateToken("admin@example.com");
+
+        mockMvc.perform(get("/api/secure/me")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void unknownSecureEndpointIsDeniedByPolicy() throws Exception {
+        User user = mock(User.class);
+
+        when(user.getEmail()).thenReturn("test@example.com");
+        when(user.getRole()).thenReturn(Role.USER);
+        when(user.isEnabled()).thenReturn(true);
+
+        when(userRepository.findByEmail("test@example.com"))
+                .thenReturn(Optional.of(user));
+
+        String token = jwtService.generateToken("test@example.com");
+
+        mockMvc.perform(get("/api/secure/unknown")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unknownAdminEndpointIsDeniedByPolicy() throws Exception {
+        User user = mock(User.class);
+
+        when(user.getEmail()).thenReturn("admin@example.com");
+        when(user.getRole()).thenReturn(Role.ADMIN);
+        when(user.isEnabled()).thenReturn(true);
+
+        when(userRepository.findByEmail("admin@example.com"))
+                .thenReturn(Optional.of(user));
+
+        String token = jwtService.generateToken("admin@example.com");
+
+        mockMvc.perform(get("/api/admin/unknown")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void unsupportedMethodIsDeniedByPolicy() throws Exception {
+        User user = mock(User.class);
+
+        when(user.getEmail()).thenReturn("admin@example.com");
+        when(user.getRole()).thenReturn(Role.ADMIN);
+        when(user.isEnabled()).thenReturn(true);
+
+        when(userRepository.findByEmail("admin@example.com"))
+                .thenReturn(Optional.of(user));
+
+        String token = jwtService.generateToken("admin@example.com");
+
+        mockMvc.perform(put("/api/admin/dashboard")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
     }
 }
