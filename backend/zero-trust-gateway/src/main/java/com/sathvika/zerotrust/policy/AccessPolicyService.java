@@ -1,3 +1,4 @@
+
 package com.sathvika.zerotrust.policy;
 
 import org.springframework.security.core.Authentication;
@@ -24,14 +25,17 @@ public class AccessPolicyService {
         boolean isUser = hasRole(authentication, "ROLE_USER");
         boolean isAdmin = hasRole(authentication, "ROLE_ADMIN");
 
+        // Allow users and admins to access their secure profile.
         if ("GET".equalsIgnoreCase(method)
                 && "/api/secure/me".equals(path)) {
             if (isUser || isAdmin) {
-                return new PolicyDecision(true, "SECURE_PROFILE_POLICY_MATCHED");
+                return new PolicyDecision(
+                        true, "SECURE_PROFILE_POLICY_MATCHED");
             }
             return new PolicyDecision(false, "INSUFFICIENT_ROLE");
         }
 
+        // Only admins can access the admin dashboard.
         if ("GET".equalsIgnoreCase(method)
                 && "/api/admin/dashboard".equals(path)) {
             if (isAdmin) {
@@ -40,6 +44,17 @@ public class AccessPolicyService {
             return new PolicyDecision(false, "INSUFFICIENT_ROLE");
         }
 
+        // Only admins can view persisted security audit events.
+        if ("GET".equalsIgnoreCase(method)
+                && "/api/admin/audit-events".equals(path)) {
+            if (isAdmin) {
+                return new PolicyDecision(
+                        true, "AUDIT_EVENTS_POLICY_MATCHED");
+            }
+            return new PolicyDecision(false, "INSUFFICIENT_ROLE");
+        }
+
+        // Default deny: all unmatched routes and methods are rejected.
         return new PolicyDecision(false, "NO_MATCHING_POLICY");
     }
 

@@ -5,6 +5,7 @@ import com.sathvika.zerotrust.auth.JwtAuthenticationFilter;
 import com.sathvika.zerotrust.auth.JwtService;
 import com.sathvika.zerotrust.policy.AccessPolicyService;
 import com.sathvika.zerotrust.user.UserRepository;
+
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

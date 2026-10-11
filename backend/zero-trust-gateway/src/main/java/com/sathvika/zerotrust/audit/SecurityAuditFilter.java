@@ -1,3 +1,4 @@
+
 package com.sathvika.zerotrust.audit;
 
 import com.sathvika.zerotrust.policy.AccessPolicyService;
@@ -21,9 +22,13 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
             LoggerFactory.getLogger(SecurityAuditFilter.class);
 
     private final AccessPolicyService policyService;
+    private final AuditEventService auditEventService;
 
-    public SecurityAuditFilter(AccessPolicyService policyService) {
+    public SecurityAuditFilter(
+            AccessPolicyService policyService,
+            AuditEventService auditEventService) {
         this.policyService = policyService;
+        this.auditEventService = auditEventService;
     }
 
     @Override
@@ -45,25 +50,23 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
                         SecurityContextHolder.getContext()
                                 .getAuthentication();
 
-                String actor = authentication != null
+                boolean authenticated = authentication != null
                         && authentication.isAuthenticated()
-                        && !"anonymousUser".equals(authentication.getName())
+                        && !"anonymousUser".equals(authentication.getName());
+
+                String actor = authenticated
                         ? authentication.getName()
                         : "ANONYMOUS";
 
-                String role = "NONE";
+                String role = authenticated
+                        ? authentication.getAuthorities().stream()
+                                .map(authority -> authority.getAuthority())
+                                .sorted()
+                                .findFirst()
+                                .orElse("NONE")
+                        : "NONE";
 
-                if (authentication != null
-                        && authentication.isAuthenticated()
-                        && !"anonymousUser".equals(authentication.getName())) {
-                    role = authentication.getAuthorities().stream()
-                            .map(authority -> authority.getAuthority())
-                            .sorted()
-                            .findFirst()
-                            .orElse("NONE");
-                }
-
-                AccessPolicyService.PolicyDecision decision =
+                AccessPolicyService.PolicyDecision policyDecision =
                         policyService.evaluate(
                                 authentication,
                                 request.getMethod(),
@@ -71,7 +74,18 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
 
                 String outcome = response.getStatus() >= 400
                         ? "DENY"
-                        : decision.allowed() ? "ALLOW" : "DENY";
+                        : policyDecision.allowed() ? "ALLOW" : "DENY";
+
+                AuditEvent event = new AuditEvent(
+                        actor,
+                        role,
+                        request.getMethod(),
+                        path,
+                        outcome,
+                        policyDecision.reason(),
+                        response.getStatus());
+
+                auditEventService.recordSafely(event);
 
                 log.info(
                         "SECURITY_AUDIT actor={} role={} method={} path={} "
@@ -81,9 +95,8 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
                         request.getMethod(),
                         path,
                         outcome,
-                        decision.reason(),
-                        response.getStatus()
-                );
+                        policyDecision.reason(),
+                        response.getStatus());
             }
         }
     }
